@@ -56,6 +56,34 @@ Col<eT>::Col(const uword in_n_rows, const uword in_n_cols)
 
 
 
+template<typename eT>
+template<typename fill_type>
+inline
+Col<eT>::Col(const uword in_n_elem, const fill::fill_class<fill_type>& f)
+  : Mat<eT>(arma_vec_indicator(), in_n_elem, 1, 1)
+  {
+  arma_extra_debug_sigprint();
+  
+  (*this).fill(f);
+  }
+
+
+
+template<typename eT>
+template<typename fill_type>
+inline
+Col<eT>::Col(const uword in_n_rows, const uword in_n_cols, const fill::fill_class<fill_type>& f)
+  : Mat<eT>(arma_vec_indicator(), 0, 0, 1)
+  {
+  arma_extra_debug_sigprint();
+  
+  Mat<eT>::init_warm(in_n_rows, in_n_cols);
+  
+  (*this).fill(f);
+  }
+
+
+
 //! construct a column vector from specified text
 template<typename eT>
 inline
@@ -207,6 +235,68 @@ Col<eT>::operator=(const std::vector<eT>& x)
     return *this;
     }
   
+  
+  
+  template<typename eT>
+  inline
+  Col<eT>::Col(Col<eT>&& X)
+    : Mat<eT>(arma_vec_indicator(), 1)
+    {
+    arma_extra_debug_sigprint(arma_boost::format("this = %x   X = %x") % this % &X);
+    
+    access::rw(Mat<eT>::n_rows) = X.n_rows;
+    access::rw(Mat<eT>::n_cols) = 1;
+    access::rw(Mat<eT>::n_elem) = X.n_elem;
+    
+    if( ((X.mem_state == 0) && (X.n_elem > arma_config::mat_prealloc)) || (X.mem_state == 1) || (X.mem_state == 2) )
+      {
+      access::rw(Mat<eT>::mem_state) = X.mem_state;
+      access::rw(Mat<eT>::mem)       = X.mem;
+      
+      access::rw(X.n_rows)    = 0;
+      access::rw(X.n_cols)    = 1;
+      access::rw(X.n_elem)    = 0;
+      access::rw(X.mem_state) = 0;
+      access::rw(X.mem)       = 0;
+      }
+    else
+      {
+      (*this).init_cold();
+      
+      arrayops::copy( (*this).memptr(), X.mem, X.n_elem );
+      
+      if( (X.mem_state == 0) && (X.n_elem <= arma_config::mat_prealloc) )
+        {
+        access::rw(X.n_rows) = 0;
+        access::rw(X.n_cols) = 1;
+        access::rw(X.n_elem) = 0;
+        access::rw(X.mem)    = 0;
+        }
+      }
+    }
+  
+  
+  
+  template<typename eT>
+  inline
+  const Col<eT>&
+  Col<eT>::operator=(Col<eT>&& X)
+    {
+    arma_extra_debug_sigprint(arma_boost::format("this = %x   X = %x") % this % &X);
+    
+    (*this).steal_mem(X);
+    
+    if( (X.mem_state == 0) && (X.n_elem <= arma_config::mat_prealloc) && (this != &X) )
+      {
+      access::rw(X.n_rows) = 0;
+      access::rw(X.n_cols) = 1;
+      access::rw(X.n_elem) = 0;
+      access::rw(X.mem)    = 0;
+      }
+    
+    return *this;
+    }
+  
 #endif
 
 
@@ -221,7 +311,9 @@ Col<eT>::Col(const SpCol<eT>& X)
   arrayops::inplace_set(Mat<eT>::memptr(), eT(0), X.n_elem);
 
   for(typename SpCol<eT>::const_iterator it = X.begin(); it != X.end(); ++it)
+    {
     at(it.row()) = (*it);
+    }
   }
 
 
@@ -234,6 +326,20 @@ Col<eT>::operator=(const eT val)
   arma_extra_debug_sigprint();
   
   Mat<eT>::operator=(val);
+  
+  return *this;
+  }
+
+
+
+template<typename eT>
+inline
+const Col<eT>&
+Col<eT>::operator=(const Col<eT>& X)
+  {
+  arma_extra_debug_sigprint();
+  
+  Mat<eT>::operator=(X);
   
   return *this;
   }
@@ -410,24 +516,28 @@ Col<eT>::st() const
 
 template<typename eT>
 arma_inline
-eT&
-Col<eT>::row(const uword row_num)
+subview_col<eT>
+Col<eT>::row(const uword in_row1)
   {
-  arma_debug_check( (row_num >= Mat<eT>::n_rows), "Col::row(): index out of bounds" );
+  arma_extra_debug_sigprint();
   
-  return access::rw(Mat<eT>::mem[row_num]);
+  arma_debug_check( (in_row1 >= Mat<eT>::n_rows), "Col::row(): indices out of bounds or incorrectly used");
+  
+  return subview_col<eT>(*this, 0, in_row1, 1);
   }
 
 
 
 template<typename eT>
 arma_inline
-eT
-Col<eT>::row(const uword row_num) const
+const subview_col<eT>
+Col<eT>::row(const uword in_row1) const
   {
-  arma_debug_check( (row_num >= Mat<eT>::n_rows), "Col::row(): index out of bounds" );
+  arma_extra_debug_sigprint();
   
-  return Mat<eT>::mem[row_num];
+  arma_debug_check( (in_row1 >= Mat<eT>::n_rows), "Col::row(): indices out of bounds or incorrectly used");
+  
+  return subview_col<eT>(*this, 0, in_row1, 1);
   }
 
 
@@ -492,6 +602,30 @@ Col<eT>::subvec(const uword in_row1, const uword in_row2) const
   const uword subview_n_rows = in_row2 - in_row1 + 1;
   
   return subview_col<eT>(*this, 0, in_row1, subview_n_rows);
+  }
+
+
+
+template<typename eT>
+arma_inline
+subview_col<eT>
+Col<eT>::rows(const span& row_span)
+  {
+  arma_extra_debug_sigprint();
+  
+  return subvec(row_span);
+  }
+
+
+
+template<typename eT>
+arma_inline
+const subview_col<eT>
+Col<eT>::rows(const span& row_span) const
+  {
+  arma_extra_debug_sigprint();
+  
+  return subvec(row_span);
   }
 
 
@@ -809,9 +943,10 @@ Col<eT>::fixed<fixed_n_elem>::fixed(const fixed<fixed_n_elem>& X)
   {
   arma_extra_debug_sigprint_this(this);
   
-  eT* dest = (use_extra) ? mem_local_extra : Mat<eT>::mem_local;
+        eT* dest = (use_extra) ?   mem_local_extra : Mat<eT>::mem_local;
+  const eT* src  = (use_extra) ? X.mem_local_extra :        X.mem_local;
   
-  arrayops::copy( dest, X.mem, fixed_n_elem );
+  arrayops::copy( dest, src, fixed_n_elem );
   }
 
 
@@ -825,6 +960,24 @@ Col<eT>::fixed<fixed_n_elem>::fixed(const subview_cube<eT>& X)
   arma_extra_debug_sigprint_this(this);
   
   Col<eT>::operator=(X);
+  }
+
+
+
+template<typename eT>
+template<uword fixed_n_elem>
+template<typename fill_type>
+inline
+Col<eT>::fixed<fixed_n_elem>::fixed(const fill::fill_class<fill_type>&)
+  : Col<eT>( arma_fixed_indicator(), fixed_n_elem, ((use_extra) ? mem_local_extra : Mat<eT>::mem_local) )
+  {
+  arma_extra_debug_sigprint_this(this);
+  
+  if(is_same_type<fill_type, fill::fill_zeros>::yes)  (*this).zeros();
+  if(is_same_type<fill_type, fill::fill_ones >::yes)  (*this).ones();
+  if(is_same_type<fill_type, fill::fill_eye  >::yes)  (*this).eye();
+  if(is_same_type<fill_type, fill::fill_randu>::yes)  (*this).randu();
+  if(is_same_type<fill_type, fill::fill_randn>::yes)  (*this).randn();
   }
 
 
@@ -1020,6 +1173,24 @@ Col<eT>::fixed<fixed_n_elem>::operator=(const subview_cube<eT>& X)
     }
   
 #endif
+
+
+
+template<typename eT>
+template<uword fixed_n_elem>
+arma_inline
+const Col<eT>&
+Col<eT>::fixed<fixed_n_elem>::operator=(const fixed<fixed_n_elem>& X)
+  {
+  arma_extra_debug_sigprint();
+  
+        eT* dest = (use_extra) ?   mem_local_extra : Mat<eT>::mem_local;
+  const eT* src  = (use_extra) ? X.mem_local_extra :        X.mem_local;
+  
+  arrayops::copy( dest, src, fixed_n_elem );
+  
+  return *this;
+  }
 
 
 

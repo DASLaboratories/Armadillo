@@ -1,5 +1,5 @@
-// Copyright (C) 2011-2013 Conrad Sanderson
-// Copyright (C) 2011-2013 NICTA (www.nicta.com.au)
+// Copyright (C) 2011-2014 Conrad Sanderson
+// Copyright (C) 2011-2014 NICTA (www.nicta.com.au)
 // 
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -32,6 +32,11 @@ class arrayops
   template<typename eT>
   arma_hot inline static void
   copy_backwards(eT* dest, const eT* src, const uword n_elem);
+  
+  
+  template<typename eT>
+  arma_hot inline static void
+  fill_zeros(eT* dest, const uword n_elem);
   
   
   // 
@@ -111,6 +116,16 @@ class arrayops
   void
   inplace_set(eT* dest, const eT val, const uword n_elem);
   
+  template<typename eT>
+  arma_hot inline static
+  void
+  inplace_set_base(eT* dest, const eT val, const uword n_elem);
+  
+  template<typename eT>
+  arma_hot inline static
+  void
+  inplace_set_small(eT* dest, const eT val, const uword n_elem);
+  
   template<typename eT, const uword n_elem>
   arma_hot inline static
   void
@@ -134,6 +149,26 @@ class arrayops
   arma_hot inline static
   void
   inplace_div(eT* dest, const eT val, const uword n_elem);
+  
+  
+  template<typename eT>
+  arma_hot inline static
+  void
+  inplace_plus_base(eT* dest, const eT val, const uword n_elem);
+  
+  template<typename eT>
+  arma_hot inline static
+  void
+  inplace_minus_base(eT* dest, const eT val, const uword n_elem);
+  
+  template<typename eT>
+  arma_hot inline static void
+  inplace_mul_base(eT* dest, const eT val, const uword n_elem);
+  
+  template<typename eT>
+  arma_hot inline static
+  void
+  inplace_div_base(eT* dest, const eT val, const uword n_elem);
   
   
   // 

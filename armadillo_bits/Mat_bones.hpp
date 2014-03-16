@@ -49,6 +49,9 @@ class Mat : public Base< eT, Mat<eT> >
   
   inline Mat(const uword in_rows, const uword in_cols);
   
+  template<typename fill_type>
+  inline Mat(const uword in_rows, const uword in_cols, const fill::fill_class<fill_type>& f);
+  
   inline                  Mat(const char*        text);
   inline const Mat& operator=(const char*        text);
   
@@ -61,6 +64,9 @@ class Mat : public Base< eT, Mat<eT> >
   #if defined(ARMA_USE_CXX11)
   inline                  Mat(const std::initializer_list<eT>& list);
   inline const Mat& operator=(const std::initializer_list<eT>& list);
+  
+  inline                  Mat(Mat&& m);
+  inline const Mat& operator=(Mat&& m);
   #endif
   
   inline Mat(      eT* aux_mem, const uword aux_n_rows, const uword aux_n_cols, const bool copy_aux_mem = true, const bool strict = true);
@@ -173,9 +179,18 @@ class Mat : public Base< eT, Mat<eT> >
   arma_inline       subview<eT> cols(const uword in_col1, const uword in_col2);
   arma_inline const subview<eT> cols(const uword in_col1, const uword in_col2) const;
   
+  inline            subview<eT> rows(const span& row_span);
+  inline      const subview<eT> rows(const span& row_span) const;
+  
+  arma_inline       subview<eT> cols(const span& col_span);
+  arma_inline const subview<eT> cols(const span& col_span) const;
+  
+  
   arma_inline       subview<eT> submat(const uword in_row1, const uword in_col1, const uword in_row2, const uword in_col2);
   arma_inline const subview<eT> submat(const uword in_row1, const uword in_col1, const uword in_row2, const uword in_col2) const;
   
+  arma_inline       subview<eT> submat(const uword in_row1, const uword in_col1, const SizeMat& s);
+  arma_inline const subview<eT> submat(const uword in_row1, const uword in_col1, const SizeMat& s) const;
   
   inline            subview<eT> submat    (const span& row_span, const span& col_span);
   inline      const subview<eT> submat    (const span& row_span, const span& col_span) const;
@@ -183,6 +198,8 @@ class Mat : public Base< eT, Mat<eT> >
   inline            subview<eT> operator()(const span& row_span, const span& col_span);
   inline      const subview<eT> operator()(const span& row_span, const span& col_span) const;
   
+  inline            subview<eT> operator()(const uword in_row1, const uword in_col1, const SizeMat& s);
+  inline      const subview<eT> operator()(const uword in_row1, const uword in_col1, const SizeMat& s) const;
   
   template<typename T1> arma_inline       subview_elem1<eT,T1> elem(const Base<uword,T1>& a);
   template<typename T1> arma_inline const subview_elem1<eT,T1> elem(const Base<uword,T1>& a) const;
@@ -329,6 +346,8 @@ class Mat : public Base< eT, Mat<eT> >
   arma_inline arma_warn_unused bool in_range(const uword   in_row, const span& col_span) const;
   arma_inline arma_warn_unused bool in_range(const span& row_span, const span& col_span) const;
   
+  arma_inline arma_warn_unused bool in_range(const uword in_row, const uword in_col, const SizeMat& s) const;
+  
   arma_inline arma_warn_unused       eT* colptr(const uword in_col);
   arma_inline arma_warn_unused const eT* colptr(const uword in_col) const;
   
@@ -351,6 +370,7 @@ class Mat : public Base< eT, Mat<eT> >
   
   inline void   resize(const uword in_elem);
   inline void   resize(const uword in_rows, const uword in_cols);
+  
   inline void  reshape(const uword in_rows, const uword in_cols, const uword dim = 0);
   
   
@@ -362,6 +382,9 @@ class Mat : public Base< eT, Mat<eT> >
   
   
   arma_hot inline const Mat& fill(const eT val);
+  
+  template<typename fill_type>
+  arma_hot inline const Mat& fill(const fill::fill_class<fill_type>& f);
   
   inline const Mat& zeros();
   inline const Mat& zeros(const uword in_elem);
@@ -566,6 +589,7 @@ class Mat<eT>::fixed : public Mat<eT>
   arma_inline fixed();
   arma_inline fixed(const fixed<fixed_n_rows, fixed_n_cols>& X);
   
+  template<typename fill_type>       inline fixed(const fill::fill_class<fill_type>& f);
   template<typename T1>              inline fixed(const Base<eT,T1>& A);
   template<typename T1, typename T2> inline fixed(const Base<pod_type,T1>& A, const Base<pod_type,T2>& B);
   
@@ -581,6 +605,8 @@ class Mat<eT>::fixed : public Mat<eT>
     inline                fixed(const std::initializer_list<eT>& list);
     inline const Mat& operator=(const std::initializer_list<eT>& list);
   #endif
+  
+  arma_inline const Mat& operator=(const fixed<fixed_n_rows, fixed_n_cols>& X);
   
   arma_inline const Op< Mat_fixed_type, op_htrans >  t() const;
   arma_inline const Op< Mat_fixed_type, op_htrans > ht() const;

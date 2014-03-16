@@ -42,6 +42,7 @@ class subview : public Base<eT, subview<eT> >
   
   inline ~subview();
   
+  inline void operator=  (const eT val);
   inline void operator+= (const eT val);
   inline void operator-= (const eT val);
   inline void operator*= (const eT val);
@@ -54,6 +55,12 @@ class subview : public Base<eT, subview<eT> >
   template<typename T1> inline void operator%= (const Base<eT,T1>& x);
   template<typename T1> inline void operator/= (const Base<eT,T1>& x);
   
+  template<typename T1> inline void operator= (const SpBase<eT, T1>& x);
+  template<typename T1> inline void operator+=(const SpBase<eT, T1>& x);
+  template<typename T1> inline void operator-=(const SpBase<eT, T1>& x);
+  template<typename T1> inline void operator%=(const SpBase<eT, T1>& x);
+  template<typename T1> inline void operator/=(const SpBase<eT, T1>& x);
+
   inline void operator=  (const subview& x);
   inline void operator+= (const subview& x);
   inline void operator-= (const subview& x);
@@ -74,6 +81,8 @@ class subview : public Base<eT, subview<eT> >
   inline void zeros();
   inline void ones();
   inline void eye();
+  inline void randu();
+  inline void randn();
   
   inline eT  at_alt    (const uword ii) const;
   
@@ -190,6 +199,7 @@ class subview_col : public subview<eT>
   
   inline void operator= (const subview<eT>& x);
   inline void operator= (const subview_col& x);
+  inline void operator= (const eT val);
   
   template<typename T1>
   inline void operator= (const Base<eT,T1>& x);
@@ -197,6 +207,10 @@ class subview_col : public subview<eT>
   arma_inline const Op<subview_col<eT>,op_htrans>  t() const;
   arma_inline const Op<subview_col<eT>,op_htrans> ht() const;
   arma_inline const Op<subview_col<eT>,op_strans> st() const;
+  
+  inline void fill(const eT val);
+  inline void zeros();
+  inline void ones();
   
   arma_inline eT  at_alt    (const uword i) const;
   
@@ -253,6 +267,7 @@ class subview_row : public subview<eT>
   
   inline void operator= (const subview<eT>& x);
   inline void operator= (const subview_row& x);
+  inline void operator= (const eT val);
   
   template<typename T1>
   inline void operator= (const Base<eT,T1>& x);

@@ -1,6 +1,7 @@
 // Copyright (C) 2008-2013 Conrad Sanderson
 // Copyright (C) 2008-2013 NICTA (www.nicta.com.au)
-// Copyright (C)      2011 James Sanders
+// Copyright (C) 2011 James Sanders
+// Copyright (C) 2013 Ryan Curtin
 // 
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -30,6 +31,25 @@ subview<eT>::subview(const Mat<eT>& in_m, const uword in_row1, const uword in_co
   , n_elem(in_n_rows*in_n_cols)
   {
   arma_extra_debug_sigprint();
+  }
+
+
+
+template<typename eT>
+inline
+void
+subview<eT>::operator= (const eT val)
+  {
+  arma_extra_debug_sigprint();
+  
+  if(n_elem != 1)
+    {
+    arma_debug_assert_same_size(n_rows, n_cols, 1, 1, "copy into submatrix");
+    }
+  
+  Mat<eT>& X = const_cast< Mat<eT>& >(m);
+  
+  X.at(aux_row1, aux_col1) = val;
   }
 
 
@@ -728,6 +748,135 @@ subview<eT>::operator/= (const Base<eT,T1>& in)
 
 
 
+template<typename eT>
+template<typename T1>
+inline
+void
+subview<eT>::operator=(const SpBase<eT, T1>& x)
+  {
+  arma_extra_debug_sigprint();
+  
+  const SpProxy<T1> p(x.get_ref());
+  
+  arma_debug_assert_same_size(n_rows, n_cols, p.get_n_rows(), p.get_n_cols(), "copy into submatrix");
+  
+  // Clear the subview.
+  zeros();
+  
+  // Iterate through the sparse subview and set the nonzero values appropriately.
+  typename SpProxy<T1>::const_iterator_type cit = p.begin();
+  
+  while (cit != p.end())
+    {
+    at(cit.row(), cit.col()) = *cit;
+    ++cit;
+    }
+  }
+
+
+
+template<typename eT>
+template<typename T1>
+inline
+void
+subview<eT>::operator+=(const SpBase<eT, T1>& x)
+  {
+  arma_extra_debug_sigprint();
+  
+  const SpProxy<T1> p(x.get_ref());
+  
+  arma_debug_assert_same_size(n_rows, n_cols, p.get_n_rows(), p.get_n_cols(), "addition");
+  
+  // Iterate through the sparse subview and add its values.
+  typename SpProxy<T1>::const_iterator_type cit = p.begin();
+  
+  while (cit != p.end())
+    {
+    at(cit.row(), cit.col()) += *cit;
+    ++cit;
+    }
+  }
+
+
+
+template<typename eT>
+template<typename T1>
+inline
+void
+subview<eT>::operator-=(const SpBase<eT, T1>& x)
+  {
+  arma_extra_debug_sigprint();
+  
+  const SpProxy<T1> p(x.get_ref());
+  
+  arma_debug_assert_same_size(n_rows, n_cols, p.get_n_rows(), p.get_n_cols(), "subtraction");
+  
+  // Iterate through the sparse subview and subtract its values.
+  typename SpProxy<T1>::const_iterator_type cit = p.begin();
+  
+  while (cit != p.end())
+    {
+    at(cit.row(), cit.col()) -= *cit;
+    ++cit;
+    }
+  }
+
+
+
+template<typename eT>
+template<typename T1>
+inline
+void
+subview<eT>::operator%=(const SpBase<eT, T1>& x)
+  {
+  arma_extra_debug_sigprint();
+  
+  // Temporary sparse matrix to hold the values we need.
+  SpMat<eT> tmp = x.get_ref();
+  
+  arma_debug_assert_same_size(n_rows, n_cols, tmp.n_rows, tmp.n_cols, "element-wise multiplication");
+  
+  // Iterate over nonzero values.
+  // Any zero values in the sparse expression will result in a zero in our subview.
+  typename SpMat<eT>::const_iterator cit = tmp.begin();
+  
+  while (cit != tmp.end())
+    {
+    // Set elements before this one to zero.
+    tmp.at(cit.row(), cit.col()) *= at(cit.row(), cit.col());
+    ++cit;
+    }
+  
+  // Now set the subview equal to that.
+  *this = tmp;
+  }
+
+
+
+template<typename eT>
+template<typename T1>
+inline
+void
+subview<eT>::operator/=(const SpBase<eT, T1>& x)
+  {
+  arma_extra_debug_sigprint();
+  
+  const SpProxy<T1> p(x.get_ref());
+  
+  arma_debug_assert_same_size(n_rows, n_cols, p.get_n_rows(), p.get_n_cols(), "element-wise division");
+  
+  // This is probably going to fill your subview with a bunch of NaNs,
+  // so I'm not going to bother to implement it fast.
+  // You can have slow NaNs.  They're fine too.
+  for (uword c = 0; c < n_cols; ++c)
+  for (uword r = 0; r < n_rows; ++r)
+    {
+    at(r, c) /= p.at(r, c);
+    }
+  }
+
+
+
 //! x.submat(...) = y.submat(...)
 template<typename eT>
 inline
@@ -1182,7 +1331,20 @@ subview<eT>::zeros()
   {
   arma_extra_debug_sigprint();
   
-  (*this).fill(eT(0));
+  const uword local_n_cols = n_cols;
+  const uword local_n_rows = n_rows;
+  
+  if(local_n_rows == 1)
+    {
+    (*this).fill(eT(0));
+    }
+  else
+    {
+    for(uword ucol=0; ucol < local_n_cols; ++ucol)
+      {
+      arrayops::fill_zeros( colptr(ucol), local_n_rows );
+      }
+    }
   }
 
 
@@ -1206,13 +1368,69 @@ subview<eT>::eye()
   {
   arma_extra_debug_sigprint();
   
-  fill(eT(0));
+  (*this).zeros();
   
   const uword N = (std::min)(n_rows, n_cols);
   
   for(uword ii=0; ii < N; ++ii)
     {
     at(ii,ii) = eT(1);
+    }
+  }
+
+
+
+template<typename eT>
+inline
+void
+subview<eT>::randu()
+  {
+  arma_extra_debug_sigprint();
+  
+  const uword local_n_rows = n_rows;
+  const uword local_n_cols = n_cols;
+  
+  if(local_n_rows == 1)
+    {
+    for(uword ii=0; ii < local_n_cols; ++ii)
+      {
+      at(0,ii) = eT(arma_rng::randu<eT>());
+      }
+    }
+  else
+    {
+    for(uword ii=0; ii < local_n_cols; ++ii)
+      {
+      arma_rng::randu<eT>::fill( colptr(ii), local_n_rows );
+      }
+    }
+  }
+
+
+
+template<typename eT>
+inline
+void
+subview<eT>::randn()
+  {
+  arma_extra_debug_sigprint();
+  
+  const uword local_n_rows = n_rows;
+  const uword local_n_cols = n_cols;
+  
+  if(local_n_rows == 1)
+    {
+    for(uword ii=0; ii < local_n_cols; ++ii)
+      {
+      at(0,ii) = eT(arma_rng::randn<eT>());
+      }
+    }
+  else
+    {
+    for(uword ii=0; ii < local_n_cols; ++ii)
+      {
+      arma_rng::randn<eT>::fill( colptr(ii), local_n_rows );
+      }
     }
   }
 
@@ -2407,10 +2625,6 @@ subview_col<eT>::operator=(const subview<eT>& X)
   arma_extra_debug_sigprint();
   
   subview<eT>::operator=(X);
-  
-  access::rw(colmem) = subview<eT>::colptr(0);
-  
-  arma_debug_check( (subview<eT>::n_cols > 1), "subview_col(): incompatible dimensions" );
   }
 
 
@@ -2423,10 +2637,23 @@ subview_col<eT>::operator=(const subview_col<eT>& X)
   arma_extra_debug_sigprint();
   
   subview<eT>::operator=(X); // interprets 'subview_col' as 'subview'
+  }
+
+
+
+template<typename eT>
+inline
+void
+subview_col<eT>::operator=(const eT val)
+  {
+  arma_extra_debug_sigprint();
   
-  access::rw(colmem) = subview<eT>::colptr(0);
+  if(subview<eT>::n_elem != 1)
+    {
+    arma_debug_assert_same_size(subview<eT>::n_rows, subview<eT>::n_cols, 1, 1, "copy into submatrix");
+    }
   
-  arma_debug_check( (subview<eT>::n_cols > 1), "subview_col(): incompatible dimensions" );
+  access::rw( colmem[0] ) = val;
   }
 
 
@@ -2440,10 +2667,6 @@ subview_col<eT>::operator=(const Base<eT,T1>& X)
   arma_extra_debug_sigprint();
   
   subview<eT>::operator=(X);
-  
-  access::rw(colmem) = subview<eT>::colptr(0);
-
-  arma_debug_check( (subview<eT>::n_cols > 1), "subview_col(): incompatible dimensions" );
   }
 
 
@@ -2474,6 +2697,42 @@ const Op<subview_col<eT>,op_strans>
 subview_col<eT>::st() const
   {
   return Op<subview_col<eT>,op_strans>(*this);
+  }
+
+
+
+template<typename eT>
+inline
+void
+subview_col<eT>::fill(const eT val)
+  {
+  arma_extra_debug_sigprint();
+  
+  arrayops::inplace_set( access::rwp(colmem), val, subview<eT>::n_rows );
+  }
+
+
+
+template<typename eT>
+inline
+void
+subview_col<eT>::zeros()
+  {
+  arma_extra_debug_sigprint();
+  
+  arrayops::fill_zeros( access::rwp(colmem), subview<eT>::n_rows );
+  }
+
+
+
+template<typename eT>
+inline
+void
+subview_col<eT>::ones()
+  {
+  arma_extra_debug_sigprint();
+  
+  arrayops::inplace_set( access::rwp(colmem), eT(1), subview<eT>::n_rows );
   }
 
 
@@ -2703,7 +2962,6 @@ subview_row<eT>::operator=(const subview<eT>& X)
   arma_extra_debug_sigprint();
   
   subview<eT>::operator=(X);
-  arma_debug_check( (subview<eT>::n_rows > 1), "subview_row(): incompatible dimensions" );
   }
 
 
@@ -2716,7 +2974,18 @@ subview_row<eT>::operator=(const subview_row<eT>& X)
   arma_extra_debug_sigprint();
   
   subview<eT>::operator=(X); // interprets 'subview_row' as 'subview'
-  arma_debug_check( (subview<eT>::n_rows > 1), "subview_row(): incompatible dimensions" );
+  }
+
+
+
+template<typename eT>
+inline
+void
+subview_row<eT>::operator=(const eT val)
+  {
+  arma_extra_debug_sigprint();
+  
+  subview<eT>::operator=(val); // interprets 'subview_row' as 'subview'
   }
 
 
@@ -2730,7 +2999,6 @@ subview_row<eT>::operator=(const Base<eT,T1>& X)
   arma_extra_debug_sigprint();
   
   subview<eT>::operator=(X);
-  arma_debug_check( (subview<eT>::n_rows > 1), "subview_row(): incompatible dimensions" );
   }
 
 
